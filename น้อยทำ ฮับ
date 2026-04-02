@@ -1,0 +1,100 @@
+local player = game.Players.LocalPlayer
+local mouse = player:GetMouse()
+local camera = workspace.CurrentCamera
+local runService = game:GetService("RunService")
+
+-- ===== SETTINGS =====
+local settings = {
+    enabled = false,
+    fov = 120
+}
+
+local currentTarget = nil
+
+-- ===== UI =====
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+
+local toggle = Instance.new("TextButton")
+toggle.Size = UDim2.new(0,180,0,50)
+toggle.Position = UDim2.new(0,20,0,20)
+toggle.Text = "Assist: OFF"
+toggle.Parent = gui
+
+local fovBox = Instance.new("TextBox")
+fovBox.Size = UDim2.new(0,180,0,40)
+fovBox.Position = UDim2.new(0,20,0,80)
+fovBox.Text = "FOV: 120"
+fovBox.Parent = gui
+
+local targetLabel = Instance.new("TextLabel")
+targetLabel.Size = UDim2.new(0,200,0,40)
+targetLabel.Position = UDim2.new(0.5,-100,0,20)
+targetLabel.Text = "Target: None"
+targetLabel.Parent = gui
+
+-- ===== FOV CIRCLE =====
+local circle = Drawing.new("Circle")
+circle.Thickness = 2
+circle.Filled = false
+circle.Visible = false
+circle.Radius = settings.fov
+
+-- ===== UI EVENTS =====
+toggle.MouseButton1Click:Connect(function()
+    settings.enabled = not settings.enabled
+    toggle.Text = settings.enabled and "Assist: ON" or "Assist: OFF"
+    circle.Visible = settings.enabled
+end)
+
+fovBox.FocusLost:Connect(function()
+    local num = tonumber(fovBox.Text:match("%d+"))
+    if num then
+        settings.fov = num
+        circle.Radius = num
+    end
+    fovBox.Text = "FOV: "..settings.fov
+end)
+
+-- ===== MAIN LOOP =====
+runService.RenderStepped:Connect(function()
+    local viewport = camera.ViewportSize
+    circle.Position = Vector2.new(viewport.X/2, viewport.Y/2)
+
+    if not settings.enabled then
+        targetLabel.Text = "Target: None"
+        return
+    end
+
+    local closest = nil
+    local shortestDist = settings.fov
+
+    for _, plr in pairs(game.Players:GetPlayers()) do
+        if plr ~= player and plr.Character then
+            local head = plr.Character:FindFirstChild("Head")
+            if head then
+                local pos, onScreen = camera:WorldToViewportPoint(head.Position)
+                if onScreen then
+                    local dist = (Vector2.new(mouse.X, mouse.Y) - Vector2.new(pos.X, pos.Y)).Magnitude
+                    if dist < shortestDist then
+                        shortestDist = dist
+                        closest = plr
+                    end
+                end
+            end
+        end
+    end
+
+    currentTarget = closest
+
+    if currentTarget then
+        targetLabel.Text = "Target: "..currentTarget.Name
+
+        -- highlight หัว
+        local head = currentTarget.Character:FindFirstChild("Head")
+        if head then
+            head.Color = Color3.fromRGB(255,0,0)
+        end
+    else
+        targetLabel.Text = "Target: None"
+    end
+end)
