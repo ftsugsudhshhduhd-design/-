@@ -1,0 +1,171 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local UIS = game:GetService("UserInputService")
+
+-- ================= UI =================
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 260, 0, 220)
+frame.Position = UDim2.new(0, 100, 0, 100)
+frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+frame.Active = true
+
+-- ลาก UI
+local dragging = false
+local dragStart, startPos
+
+frame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = frame.Position
+	end
+end)
+
+frame.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = false
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = input.Position - dragStart
+		frame.Position = UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset + delta.X,
+			startPos.Y.Scale,
+			startPos.Y.Offset + delta.Y
+		)
+	end
+end)
+
+-- ชื่อ UI
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1,0,0,30)
+title.Text = "แคนสายติด"
+title.TextColor3 = Color3.new(1,1,1)
+title.BackgroundTransparency = 1
+
+-- ปุ่มย่อ
+local minimize = Instance.new("TextButton", frame)
+minimize.Size = UDim2.new(0,30,0,30)
+minimize.Position = UDim2.new(1,-30,0,0)
+minimize.Text = "-"
+
+local minimized = false
+
+-- ================= ตัวแปร =================
+local headSize = 2
+local espOn = true
+local highlights = {}
+
+-- ================= ฟังก์ชัน =================
+local function applyToAll()
+	for _, plr in pairs(Players:GetPlayers()) do
+		if plr ~= player and plr.Character and plr.Character:FindFirstChild("Head") then
+			local head = plr.Character.Head
+			
+			head.Size = Vector3.new(headSize, headSize, headSize)
+			
+			if not highlights[plr] then
+				local h = Instance.new("Highlight")
+				h.FillColor = Color3.fromRGB(255,0,0)
+				h.FillTransparency = 0.4
+				h.Adornee = head
+				h.Parent = head
+				highlights[plr] = h
+			end
+			
+			highlights[plr].Enabled = espOn
+		end
+	end
+end
+
+-- ================= ปรับขนาด =================
+local sizeLabel = Instance.new("TextLabel", frame)
+sizeLabel.Position = UDim2.new(0,10,0,40)
+sizeLabel.Size = UDim2.new(1,-20,0,20)
+sizeLabel.Text = "ขนาดหัว: "..headSize
+sizeLabel.TextColor3 = Color3.new(1,1,1)
+sizeLabel.BackgroundTransparency = 1
+
+local plus = Instance.new("TextButton", frame)
+plus.Position = UDim2.new(0,10,0,70)
+plus.Size = UDim2.new(0,50,0,30)
+plus.Text = "+"
+
+plus.MouseButton1Click:Connect(function()
+	headSize = math.clamp(headSize + 5, 1, 300)
+	sizeLabel.Text = "ขนาดหัว: "..headSize
+	applyToAll()
+end)
+
+local minus = Instance.new("TextButton", frame)
+minus.Position = UDim2.new(0,70,0,70)
+minus.Size = UDim2.new(0,50,0,30)
+minus.Text = "-"
+
+minus.MouseButton1Click:Connect(function()
+	headSize = math.clamp(headSize - 5, 1, 300)
+	sizeLabel.Text = "ขนาดหัว: "..headSize
+	applyToAll()
+end)
+
+-- ================= โปร่งใส =================
+local transBtn = Instance.new("TextButton", frame)
+transBtn.Position = UDim2.new(0,10,0,110)
+transBtn.Size = UDim2.new(0,110,0,30)
+transBtn.Text = "หัวโปร่งใส"
+
+transBtn.MouseButton1Click:Connect(function()
+	for _, plr in pairs(Players:GetPlayers()) do
+		if plr ~= player and plr.Character and plr.Character:FindFirstChild("Head") then
+			plr.Character.Head.Transparency = 0.5
+		end
+	end
+end)
+
+-- ================= ESP =================
+local espBtn = Instance.new("TextButton", frame)
+espBtn.Position = UDim2.new(0,130,0,110)
+espBtn.Size = UDim2.new(0,110,0,30)
+espBtn.Text = "เปิด/ปิด ESP"
+
+espBtn.MouseButton1Click:Connect(function()
+	espOn = not espOn
+	applyToAll()
+end)
+
+-- ================= ย่อ UI =================
+minimize.MouseButton1Click:Connect(function()
+	minimized = not minimized
+	
+	for _, obj in pairs(frame:GetChildren()) do
+		if obj ~= title and obj ~= minimize then
+			obj.Visible = not minimized
+		end
+	end
+	
+	if minimized then
+		frame.Size = UDim2.new(0,260,0,30)
+	else
+		frame.Size = UDim2.new(0,260,0,220)
+	end
+end)
+
+-- ================= โหลดผู้เล่น =================
+for _, plr in pairs(Players:GetPlayers()) do
+	plr.CharacterAdded:Connect(function()
+		task.wait(1)
+		applyToAll()
+	end)
+end
+
+Players.PlayerAdded:Connect(function(plr)
+	plr.CharacterAdded:Connect(function()
+		task.wait(1)
+		applyToAll()
+	end)
+end)
