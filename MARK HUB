@@ -1,0 +1,233 @@
+-- MARK HUB MOBILE PRO FINAL (ESP + NO RESET + MOBILE)
+
+local player = game.Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+
+-- SETTINGS
+local lockEnabled = false
+local showFOV = true
+
+local FOV = 150
+local aimPart = "HumanoidRootPart"
+local markerSize = 0.6
+
+local target = nil
+local espBill, espText
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "MARK_HUB"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0,240,0,300)
+frame.Position = UDim2.new(0.3,0,0.3,0)
+frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+
+-- TOPBAR
+local topbar = Instance.new("Frame", frame)
+topbar.Size = UDim2.new(1,0,0,40)
+topbar.BackgroundColor3 = Color3.fromRGB(15,15,15)
+
+local title = Instance.new("TextLabel", topbar)
+title.Size = UDim2.new(1,0,1,0)
+title.Text = "MARK HUB"
+title.BackgroundTransparency = 1
+title.TextColor3 = Color3.new(1,1,1)
+title.TextScaled = true
+
+-- DRAG
+local dragging, dragInput, dragStart, startPos
+
+topbar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch 
+	or input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragInput = input
+		dragStart = input.Position
+		startPos = frame.Position
+	end
+end)
+
+UIS.InputEnded:Connect(function(input)
+	if input == dragInput then dragging = false end
+end)
+
+UIS.InputChanged:Connect(function(input)
+	if dragging and input == dragInput then
+		local delta = input.Position - dragStart
+		frame.Position = UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset + delta.X,
+			startPos.Y.Scale,
+			startPos.Y.Offset + delta.Y
+		)
+	end
+end)
+
+-- BUTTON
+local function makeBtn(text, y)
+	local b = Instance.new("TextButton", frame)
+	b.Size = UDim2.new(1,0,0,40)
+	b.Position = UDim2.new(0,0,0,y)
+	b.Text = text
+	b.TextScaled = true
+	b.BackgroundColor3 = Color3.fromRGB(30,30,30)
+	b.TextColor3 = Color3.new(1,1,1)
+	return b
+end
+
+local lockBtn = makeBtn("ล็อกเป้า: ปิด",50)
+local aimBtn = makeBtn("ยิง: ตัว",90)
+local fovBtn = makeBtn("FOV: เปิด",130)
+
+-- FOV
+local circle = Instance.new("Frame", gui)
+circle.AnchorPoint = Vector2.new(0.5,0.5)
+circle.BackgroundTransparency = 1
+
+local stroke = Instance.new("UIStroke", circle)
+stroke.Thickness = 2
+stroke.Color = Color3.new(1,1,1)
+
+local corner = Instance.new("UICorner", circle)
+corner.CornerRadius = UDim.new(1,0)
+
+-- MARKER
+local function createMarker()
+	local m = Instance.new("Part")
+	m.Shape = Enum.PartType.Ball
+	m.Anchored = true
+	m.CanCollide = false
+	m.Material = Enum.Material.Neon
+	m.Color = Color3.fromRGB(255,0,0)
+	m.Size = Vector3.new(markerSize,markerSize,markerSize)
+	m.Parent = workspace
+	return m
+end
+
+local marker = createMarker()
+
+-- ESP FUNCTION
+local function createESP(char)
+	local bill = Instance.new("BillboardGui")
+	bill.Size = UDim2.new(0,120,0,40)
+	bill.AlwaysOnTop = true
+	bill.StudsOffset = Vector3.new(0,3,0)
+
+	local txt = Instance.new("TextLabel", bill)
+	txt.Size = UDim2.new(1,0,1,0)
+	txt.BackgroundTransparency = 1
+	txt.TextColor3 = Color3.fromRGB(255,0,0)
+	txt.TextScaled = true
+
+	bill.Parent = char:WaitForChild("Head")
+	return bill, txt
+end
+
+-- FUNCTIONS
+local function updateFOV()
+	circle.Size = UDim2.new(0,FOV*2,0,FOV*2)
+	circle.Position = UDim2.new(0.5,0,0.5,0)
+end
+
+local function getClosestTarget()
+	local closest = nil
+	local shortest = FOV
+	
+	for _,v in pairs(game.Players:GetPlayers()) do
+		if v ~= player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+			
+			local pos, onScreen = camera:WorldToViewportPoint(v.Character.HumanoidRootPart.Position)
+			if onScreen then
+				local dist = (Vector2.new(pos.X,pos.Y) - Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)).Magnitude
+				
+				if dist <= FOV and dist < shortest then
+					shortest = dist
+					closest = v
+				end
+			end
+		end
+	end
+	
+	return closest
+end
+
+-- BUTTON
+lockBtn.MouseButton1Click:Connect(function()
+	lockEnabled = not lockEnabled
+	lockBtn.Text = "ล็อกเป้า: " .. (lockEnabled and "เปิด" or "ปิด")
+end)
+
+aimBtn.MouseButton1Click:Connect(function()
+	if aimPart == "HumanoidRootPart" then
+		aimPart = "Head"
+		aimBtn.Text = "ยิง: หัว"
+	else
+		aimPart = "HumanoidRootPart"
+		aimBtn.Text = "ยิง: ตัว"
+	end
+end)
+
+fovBtn.MouseButton1Click:Connect(function()
+	showFOV = not showFOV
+	circle.Visible = showFOV
+end)
+
+-- RESPAWN FIX
+player.CharacterAdded:Connect(function()
+	target = nil
+	if espBill then
+		espBill:Destroy()
+		espBill = nil
+	end
+end)
+
+-- LOOP
+RunService.RenderStepped:Connect(function()
+	updateFOV()
+
+	if not marker or not marker.Parent then
+		marker = createMarker()
+	end
+
+	if lockEnabled then
+		if not target 
+		or not target.Character 
+		or not target.Character:FindFirstChild("Humanoid") 
+		or target.Character.Humanoid.Health <= 0 then
+			
+			target = getClosestTarget()
+		end
+	end
+
+	if target and target.Character and target.Character:FindFirstChild(aimPart) then
+		local pos = target.Character[aimPart].Position
+		local dist = (pos - camera.CFrame.Position).Magnitude
+
+		camera.CFrame = camera.CFrame:Lerp(
+			CFrame.new(camera.CFrame.Position, pos),
+			0.35
+		)
+
+		marker.Position = pos + Vector3.new(0,2,0)
+		marker.Transparency = 0
+
+		-- 🔥 ESP
+		if not espBill then
+			espBill, espText = createESP(target.Character)
+		end
+		espText.Text = target.Name .. " | " .. math.floor(dist) .. "m"
+
+	else
+		marker.Transparency = 1
+		if espBill then
+			espBill:Destroy()
+			espBill = nil
+		end
+	end
+end)
